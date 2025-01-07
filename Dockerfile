@@ -1,4 +1,4 @@
-FROM quay.io/ceph/ceph:latest
+FROM quay.io/ceph/ceph:v19.2.0
 
 RUN dnf install -y python3 python3-pip
 
