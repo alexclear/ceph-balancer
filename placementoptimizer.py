@@ -5499,6 +5499,7 @@ def main():
                     balance_args.osdfrom = "alternate"  # Set default osdfrom method
                     balance_args.pg_choice = "largest"  # Set default pg choice method
                     balance_args.only_crushclass = None  # Set default crushclass filter
+                    balance_args.source_osds = None  # Set default source OSDs filter
                     balance_args.only_poolid = None  # Set default pool filter
                     balance_args.only_pool = None  # Set default pool filter
                     balance_args.ignore_ideal_pgcounts = "none"  # Set default pgcount ignore mode
