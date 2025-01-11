@@ -3,7 +3,7 @@ FROM quay.io/ceph/ceph:v18.2.2
 RUN sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-* && \
     sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-* && \
     rm -f /etc/yum.repos.d/_copr:copr.fedorainfracloud.org:tchaikov:python-scikit-learn.repo && \
-    rm -f /etc/yum.repos.d/ceph.repo
+    rm -f /etc/yum.repos.d/ceph.repo && \
     cat <<EOF > /etc/yum.repos.d/ceph.repo
 [Ceph]
 name=Ceph packages
