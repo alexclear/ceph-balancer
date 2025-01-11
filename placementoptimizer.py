@@ -48,13 +48,6 @@ def parse_args():
     sp = cli.add_subparsers(dest='mode')
     sp.required = True
 
-    # HTTP metrics server
-    servesp = sp.add_parser('serve', help="run prometheus metrics HTTP server")
-    servesp.add_argument('--port', type=int, default=8000,
-                        help="HTTP server port (default: %(default)s)")
-    servesp.add_argument('--host', default='localhost',
-                        help="HTTP server host (default: %(default)s)") 
-
     ### parsers used in subcommands
     statep = argparse.ArgumentParser(add_help=False)
     statep.add_argument("--state", "-s", help="load cluster state from this jsonfile")
@@ -93,6 +86,14 @@ def parse_args():
 
     savemappingp = argparse.ArgumentParser(add_help=False)
     savemappingp.add_argument("--save-mappings", help="filename to store the resulting up osdid set for all pgs (to see where things are placed)")
+
+    # HTTP metrics server
+    servesp = sp.add_parser('serve', parents=[statep, upmapp, osdsizep, usedestimatep, savemappingp],
+                           help="run prometheus metrics HTTP server")
+    servesp.add_argument('--port', type=int, default=8000,
+                        help="HTTP server port (default: %(default)s)")
+    servesp.add_argument('--host', default='localhost',
+                        help="HTTP server host (default: %(default)s)") 
 
     ### subcommands
     gathersp = sp.add_parser('gather', help="only gather cluster information, i.e. generate a state file")
