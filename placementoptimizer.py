@@ -5504,6 +5504,7 @@ def main():
                     balance_args.ignore_ideal_pgcounts = "none"  # Set default pgcount ignore mode
                     balance_args.ignore_target_usage = False  # Set default target usage check
                     balance_args.ensure_target_limits = False  # Set default target limits check
+                    balance_args.save_timings = None  # Set default save timings
                     balance_output = ""
                     
                     def capture_output(output_str):
