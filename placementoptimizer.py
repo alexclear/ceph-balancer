@@ -5507,6 +5507,7 @@ def main():
                     balance_args.ensure_target_limits = False  # Set default target limits check
                     balance_args.save_timings = None  # Set default save timings
                     balance_args.ignore_pgsize_toolarge = False  # Set default pg size check
+                    balance_args.ensure_optimal_moves = False  # Set default optimal moves check
                     balance_output = ""
                     
                     def capture_output(output_str):
