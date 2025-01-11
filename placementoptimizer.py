@@ -5493,9 +5493,10 @@ def main():
             # Keep the script running and perform balancing
             while True:
                 try:
-                    # Run balance function
+                    # Run balance function with required parameters
                     balance_args = args
                     balance_args.output = "-"  # Output to stdout for capturing
+                    balance_args.osdfrom = "alternate"  # Set default osdfrom method
                     balance_output = ""
                     
                     def capture_output(output_str):
