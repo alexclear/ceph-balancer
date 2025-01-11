@@ -12,6 +12,7 @@ import argparse
 import binascii
 import datetime
 import itertools
+from http.server import HTTPServer
 import io
 import json
 import logging
@@ -46,6 +47,13 @@ def parse_args():
 
     sp = cli.add_subparsers(dest='mode')
     sp.required = True
+
+    # HTTP metrics server
+    servesp = sp.add_parser('serve', help="run prometheus metrics HTTP server")
+    servesp.add_argument('--port', type=int, default=8000,
+                        help="HTTP server port (default: %(default)s)")
+    servesp.add_argument('--host', default='localhost',
+                        help="HTTP server host (default: %(default)s)") 
 
     ### parsers used in subcommands
     statep = argparse.ArgumentParser(add_help=False)
@@ -5465,6 +5473,16 @@ def main():
 
         elif args.mode == 'repairstats':
             run = lambda: repairstats(args, state)
+
+        elif args.mode == "serve":
+            from prometheus_client import start_http_server, REGISTRY, PROCESS_COLLECTOR, PLATFORM_COLLECTOR
+            # Start up the server to expose the metrics
+            start_http_server(args.port, addr=args.host)
+            logging.info(f"Serving metrics on http://{args.host}:{args.port}/metrics")
+            # Keep the script running
+            import time
+            while True:
+                time.sleep(1)
 
         elif args.mode == "osdmap":
             if args.osdmapmode == "export":
