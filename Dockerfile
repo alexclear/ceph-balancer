@@ -15,7 +15,7 @@ EOF
 RUN yum install -y python3 python3-pip
 
 COPY requirements.txt /tmp/
-RUN pip install -r /tmp/requirements.txt
+RUN pip3 install -r /tmp/requirements.txt
 
 COPY placementoptimizer.py /usr/local/bin/placementoptimizer
 RUN chmod +x /usr/local/bin/placementoptimizer
