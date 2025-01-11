@@ -5500,6 +5500,7 @@ def main():
                     balance_args.pg_choice = "largest"  # Set default pg choice method
                     balance_args.only_crushclass = None  # Set default crushclass filter
                     balance_args.only_poolid = None  # Set default pool filter
+                    balance_args.only_pool = None  # Set default pool filter
                     balance_output = ""
                     
                     def capture_output(output_str):
