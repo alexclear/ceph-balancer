@@ -93,7 +93,13 @@ def parse_args():
     servesp.add_argument('--port', type=int, default=9098,
                         help="HTTP server port (default: %(default)s)")
     servesp.add_argument('--host', default='0.0.0.0',
-                        help="HTTP server host (default: %(default)s)") 
+                        help="HTTP server host (default: %(default)s)")
+    servesp.add_argument('--max-pg-moves', '-m', type=int, default=10,
+                        help='maximum number of pg movements to find per iteration, default: %(default)s')
+    servesp.add_argument('--max-move-attempts', type=int, default=2,
+                        help="current source osd can't be emptied more, try this many more other osds candidates to empty. default: %(default)s")
+    servesp.add_argument('--sleep-timeout', type=int, default=300,
+                        help="sleep timeout between balance attempts in seconds (default: %(default)s)")
 
     ### subcommands
     gathersp = sp.add_parser('gather', help="only gather cluster information, i.e. generate a state file")
@@ -5476,14 +5482,53 @@ def main():
             run = lambda: repairstats(args, state)
 
         elif args.mode == "serve":
+            import subprocess
+            import time
             from prometheus_client import start_http_server, REGISTRY, PROCESS_COLLECTOR, PLATFORM_COLLECTOR
+
             # Start up the server to expose the metrics
             start_http_server(args.port, addr=args.host)
             logging.info(f"Serving metrics on http://{args.host}:{args.port}/metrics")
-            # Keep the script running
-            import time
+
+            # Keep the script running and perform balancing
             while True:
-                time.sleep(1)
+                try:
+                    # Run balance function
+                    balance_args = args
+                    balance_args.output = "-"  # Output to stdout for capturing
+                    balance_output = ""
+                    
+                    def capture_output(output_str):
+                        nonlocal balance_output
+                        balance_output += output_str + "\n"
+                    
+                    # Redirect stdout to our capture function
+                    import sys
+                    from io import StringIO
+                    old_stdout = sys.stdout
+                    sys.stdout = StringIO()
+                    
+                    try:
+                        balance(balance_args, state)
+                        balance_output = sys.stdout.getvalue()
+                    finally:
+                        sys.stdout = old_stdout
+
+                    # Execute the balance commands if any were generated
+                    if balance_output.strip():
+                        logging.info("Executing balance commands:")
+                        for cmd in balance_output.splitlines():
+                            if cmd.strip():
+                                logging.info(f"Running: {cmd}")
+                                subprocess.run(cmd, shell=True, check=True)
+                    else:
+                        logging.info("No balance commands were generated")
+
+                except Exception as e:
+                    logging.error(f"Error during balance: {e}")
+
+                logging.info(f"Sleeping for {args.sleep_timeout} seconds before next balance attempt")
+                time.sleep(args.sleep_timeout)
 
         elif args.mode == "osdmap":
             if args.osdmapmode == "export":
