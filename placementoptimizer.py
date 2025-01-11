@@ -94,9 +94,9 @@ def parse_args():
                         help="HTTP server port (default: %(default)s)")
     servesp.add_argument('--host', default='0.0.0.0',
                         help="HTTP server host (default: %(default)s)")
-    servesp.add_argument('--max-pg-moves', '-m', type=int, default=10,
+    servesp.add_argument('--max-pg-moves', '-m', type=int, default=3000,
                         help='maximum number of pg movements to find per iteration, default: %(default)s')
-    servesp.add_argument('--max-move-attempts', type=int, default=2,
+    servesp.add_argument('--max-move-attempts', type=int, default=5,
                         help="current source osd can't be emptied more, try this many more other osds candidates to empty. default: %(default)s")
     servesp.add_argument('--sleep-timeout', type=int, default=300,
                         help="sleep timeout between balance attempts in seconds (default: %(default)s)")
