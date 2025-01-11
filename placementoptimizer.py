@@ -5508,6 +5508,7 @@ def main():
                     balance_args.save_timings = None  # Set default save timings
                     balance_args.ignore_pgsize_toolarge = False  # Set default pg size check
                     balance_args.ensure_optimal_moves = False  # Set default optimal moves check
+                    balance_args.ensure_variance_decrease = False  # Set default variance decrease check
                     balance_output = ""
                     
                     def capture_output(output_str):
