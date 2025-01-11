@@ -5498,6 +5498,7 @@ def main():
                     balance_args.output = "-"  # Output to stdout for capturing
                     balance_args.osdfrom = "alternate"  # Set default osdfrom method
                     balance_args.pg_choice = "largest"  # Set default pg choice method
+                    balance_args.only_crushclass = None  # Set default crushclass filter
                     balance_output = ""
                     
                     def capture_output(output_str):
