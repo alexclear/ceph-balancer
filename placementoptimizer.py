@@ -90,9 +90,9 @@ def parse_args():
     # HTTP metrics server
     servesp = sp.add_parser('serve', parents=[statep, upmapp, osdsizep, usedestimatep, savemappingp],
                            help="run prometheus metrics HTTP server")
-    servesp.add_argument('--port', type=int, default=8000,
+    servesp.add_argument('--port', type=int, default=9098,
                         help="HTTP server port (default: %(default)s)")
-    servesp.add_argument('--host', default='localhost',
+    servesp.add_argument('--host', default='0.0.0.0',
                         help="HTTP server host (default: %(default)s)") 
 
     ### subcommands
