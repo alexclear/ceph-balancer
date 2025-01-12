@@ -5530,10 +5530,10 @@ def main():
                     # Execute the balance commands if any were generated
                     if balance_output.strip():
                         logging.info("Executing balance commands:")
-                        for cmd in balance_output.splitlines():
-                            if cmd.strip():
-                                logging.info(f"Running: {cmd}")
-                                subprocess.run(cmd, shell=True, check=True)
+                        commands = '; '.join(cmd for cmd in balance_output.splitlines() if cmd.strip())
+                        if commands:
+                            logging.info(f"Running commands: {commands}")
+                            subprocess.run(commands, shell=True, check=True)
                     else:
                         logging.info("No balance commands were generated")
 
