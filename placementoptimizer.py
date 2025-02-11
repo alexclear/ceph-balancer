@@ -5494,7 +5494,12 @@ def main():
             # Keep the script running and perform balancing
             while True:
                 try:
-                    # Run balance function with required parameters
+                    # Refresh cluster state
+                    logging.info("Refreshing cluster state...")
+                    state = ClusterState()  # Load fresh state from live cluster
+                    state.preprocess()
+
+                    # Generate balance commands with the updated state
                     balance_args = args
                     balance_args.output = "-"  # Output to stdout for capturing
                     balance_args.osdfrom = "alternate"  # Set default osdfrom method
@@ -5512,11 +5517,7 @@ def main():
                     balance_args.ensure_variance_decrease = False  # Set default variance decrease check
                     balance_output = ""
                     
-                    def capture_output(output_str):
-                        nonlocal balance_output
-                        balance_output += output_str + "\n"
-                    
-                    # Redirect stdout to our capture function
+                    # Capture balance output
                     import sys
                     from io import StringIO
                     old_stdout = sys.stdout
@@ -5538,7 +5539,6 @@ def main():
                         for cmd in commands:
                             try:
                                 logging.info(f"Running: {cmd}")
-                                # Add stdout/stderr capture and timeout
                                 result = subprocess.run(
                                     cmd,
                                     shell=True,
@@ -5553,17 +5553,14 @@ def main():
                                 logging.error(f"Command failed (code {e.returncode}):\n{e.stderr}")
                             except subprocess.TimeoutExpired:
                                 logging.error("Command timed out")
-
-                        # Refresh cluster state after applying changes
-                        state = ClusterState()  # Reload from live cluster
-                        state.preprocess()
                     else:
                         logging.info("No balance commands were generated")
 
                 except Exception as e:
-                    logging.error(f"Error during balance: {e}")
+                    logging.error(f"Error during balance cycle: {e}")
 
-                logging.info(f"Sleeping for {args.sleep_timeout} seconds before next balance attempt")
+                # Sleep to allow cluster state updates
+                logging.info(f"Sleeping for {args.sleep_timeout} seconds before balance attempt")
                 time.sleep(args.sleep_timeout)
 
         elif args.mode == "osdmap":
