@@ -5543,7 +5543,7 @@ def main():
                                     cmd,
                                     shell=True,
                                     check=True,
-                                    text=True,
+                                    universal_newlines=True,
                                     capture_output=True,
                                     timeout=30,
                                     env=env
