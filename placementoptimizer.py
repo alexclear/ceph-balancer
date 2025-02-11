@@ -5544,7 +5544,8 @@ def main():
                                     shell=True,
                                     check=True,
                                     universal_newlines=True,
-                                    capture_output=True,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE,
                                     timeout=30,
                                     env=env
                                 )
