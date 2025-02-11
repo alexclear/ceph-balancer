@@ -8,6 +8,7 @@ GPLv3 or later
 """
 
 
+import os
 import argparse
 import binascii
 import datetime
