@@ -5549,7 +5549,6 @@ def main():
                                     timeout=30,
                                     env=env
                                 )
-                                logging.info(f"Command succeeded:\n{result.stdout}")
                             except subprocess.CalledProcessError as e:
                                 logging.error(f"Command failed (code {e.returncode}):\n{e.stderr}")
                             except subprocess.TimeoutExpired:
