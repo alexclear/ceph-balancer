@@ -5532,6 +5532,8 @@ def main():
                         logging.info("Executing balance commands:")
                         commands = [cmd.strip() for cmd in balance_output.splitlines() if cmd.strip()]
 
+                        env = os.environ.copy()
+
                         for cmd in commands:
                             try:
                                 logging.info(f"Running: {cmd}")
