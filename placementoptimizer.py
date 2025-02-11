@@ -95,7 +95,7 @@ def parse_args():
                         help="HTTP server port (default: %(default)s)")
     servesp.add_argument('--host', default='0.0.0.0',
                         help="HTTP server host (default: %(default)s)")
-    servesp.add_argument('--max-pg-moves', '-m', type=int, default=3000,
+    servesp.add_argument('--max-pg-moves', '-m', type=int, default=10,
                         help='maximum number of pg movements to find per iteration, default: %(default)s')
     servesp.add_argument('--max-move-attempts', type=int, default=5,
                         help="current source osd can't be emptied more, try this many more other osds candidates to empty. default: %(default)s")
@@ -5494,9 +5494,17 @@ def main():
             # Keep the script running and perform balancing
             while True:
                 try:
-                    # Refresh cluster state
+                    # ONLY MODIFY PG MAPPINGS IF IN BALANCED STATE
+                    logging.info("Checking cluster health before balancing...")
+                    health = jsoncall("ceph health detail --format json".split())
+                    if "HEALTH_ERR" in health['status']:
+                        logging.error("Cluster in degraded state, skipping balance cycle")
+                        time.sleep(60)
+                        continue
+
+                    # Load fresh cluster state
                     logging.info("Refreshing cluster state...")
-                    state = ClusterState()  # Load fresh state from live cluster
+                    state = ClusterState()
                     state.preprocess()
 
                     # Generate balance commands with the updated state
@@ -5508,7 +5516,7 @@ def main():
                     balance_args.source_osds = None  # Set default source OSDs filter
                     balance_args.only_poolid = None  # Set default pool filter
                     balance_args.only_pool = None  # Set default pool filter
-                    balance_args.ignore_ideal_pgcounts = "none"  # Set default pgcount ignore mode
+                    balance_args.ignore_ideal_pgcounts = "all"  # Set default pgcount ignore mode
                     balance_args.ignore_target_usage = False  # Set default target usage check
                     balance_args.ensure_target_limits = False  # Set default target limits check
                     balance_args.save_timings = None  # Set default save timings
@@ -5516,10 +5524,10 @@ def main():
                     balance_args.ensure_optimal_moves = False  # Set default optimal moves check
                     balance_args.ensure_variance_decrease = False  # Set default variance decrease check
                     balance_output = ""
-                    
-                    # Capture balance output
-                    import sys
+
+                    # Generate and execute balance commands
                     from io import StringIO
+                    import sys
                     old_stdout = sys.stdout
                     sys.stdout = StringIO()
                     
@@ -5529,12 +5537,9 @@ def main():
                     finally:
                         sys.stdout = old_stdout
 
-                    # Execute the balance commands if any were generated
                     if balance_output.strip():
-                        logging.info("Executing balance commands:")
                         commands = [cmd.strip() for cmd in balance_output.splitlines() if cmd.strip()]
-
-                        env = os.environ.copy()
+                        logging.info(f"Executing {len(commands)} balance commands")
 
                         for cmd in commands:
                             try:
@@ -5546,22 +5551,24 @@ def main():
                                     universal_newlines=True,
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE,
-                                    timeout=30,
-                                    env=env
+                                    timeout=30
                                 )
                             except subprocess.CalledProcessError as e:
-                                logging.error(f"Command failed (code {e.returncode}):\n{e.stderr}")
+                                logging.error(f"Command failed (code {e.returncode}):\nSTDERR:\n{e.stderr}\nSTDOUT:\n{e.stdout}")
                             except subprocess.TimeoutExpired:
                                 logging.error("Command timed out")
                     else:
                         logging.info("No balance commands were generated")
 
-                except Exception as e:
-                    logging.error(f"Error during balance cycle: {e}")
+                    # Let the cluster stabilize
+                    stabilization_sleep = max(120, args.sleep_timeout)  # Minimum 2 minutes
+                    logging.info(f"Sleeping for {stabilization_sleep}s to allow cluster stabilization")
+                    time.sleep(stabilization_sleep)
 
-                # Sleep to allow cluster state updates
-                logging.info(f"Sleeping for {args.sleep_timeout} seconds before balance attempt")
-                time.sleep(args.sleep_timeout)
+                except Exception as e:
+                    logging.error(f"Balance cycle failed: {str(e)}")
+                    logging.info(f"Sleeping for 60 seconds before next balance attempt")
+                    time.sleep(60)  # Shorter sleep on error
 
         elif args.mode == "osdmap":
             if args.osdmapmode == "export":
