@@ -5530,10 +5530,30 @@ def main():
                     # Execute the balance commands if any were generated
                     if balance_output.strip():
                         logging.info("Executing balance commands:")
-                        commands = '; '.join(cmd for cmd in balance_output.splitlines() if cmd.strip())
-                        if commands:
-                            logging.info(f"Running commands: {commands}")
-                            subprocess.run(commands, shell=True, check=True)
+                        commands = [cmd.strip() for cmd in balance_output.splitlines() if cmd.strip()]
+
+                        for cmd in commands:
+                            try:
+                                logging.info(f"Running: {cmd}")
+                                # Add stdout/stderr capture and timeout
+                                result = subprocess.run(
+                                    cmd,
+                                    shell=True,
+                                    check=True,
+                                    text=True,
+                                    capture_output=True,
+                                    timeout=30,
+                                    env=env
+                                )
+                                logging.info(f"Command succeeded:\n{result.stdout}")
+                            except subprocess.CalledProcessError as e:
+                                logging.error(f"Command failed (code {e.returncode}):\n{e.stderr}")
+                            except subprocess.TimeoutExpired:
+                                logging.error("Command timed out")
+
+                        # Refresh cluster state after applying changes
+                        state = ClusterState()  # Reload from live cluster
+                        state.preprocess()
                     else:
                         logging.info("No balance commands were generated")
 
