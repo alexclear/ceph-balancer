@@ -4935,7 +4935,7 @@ def balance(args, cluster):
 
     # After the balancing loop ends, adjust ignore_ideal_pgcounts based on timeout
     args.ignore_ideal_pgcounts = "all" if timeout_occurred else "none"
-    logging.info(f"Next runs will ignore_ideal_pgcounts='{args.ignore_ideal_pgcounts}' due to {'timeout' if timeout_occurred else 'success'}")
+    logging.info(f"Next runs will use ignore_ideal_pgcounts='{args.ignore_ideal_pgcounts}' due to {'timeout' if timeout_occurred else 'success'}")
 
     move_size, move_count = pg_mappings.get_remaps_shardsize_count()
 
@@ -5495,6 +5495,8 @@ def main():
             run = lambda: repairstats(args, state)
 
         elif args.mode == "serve":
+            last_ignore_ideal = "none"  # Initialize with default value
+
             import subprocess
             import time
             from prometheus_client import start_http_server, REGISTRY, PROCESS_COLLECTOR, PLATFORM_COLLECTOR
@@ -5529,7 +5531,7 @@ def main():
                     balance_args = BalanceArgs()
                     balance_args.__dict__.update(vars(args))  # Copy existing args
 
-                    balance_args.ignore_ideal_pgcounts = "none"  # Respect CRUSH PG counts
+                    balance_args.ignore_ideal_pgcounts = last_ignore_ideal  # Use value from previous run
                     balance_args.osdfrom = "alternate"
                     balance_args.pg_choice = "largest"
                     balance_args.ensure_variance_decrease = True # Require measurable improvement
@@ -5604,10 +5606,14 @@ def main():
                         current_mappings = PGMappings(state, analyzer=current_analyzer)
                         current_variance_sum = sum(current_analyzer.cluster_variance.values())
 
+                        # Update last_ignore_ideal for next run
+                        last_ignore_ideal = balance_args.ignore_ideal_pgcounts
+
                         logging.info(
                             f"Move cycle complete. Moves: {len(commands)}, "
                             f"Est. data moved: {sum(pg_sizes)/1024**3:.2f}GB, "
-                            f"Variance Δ: {prev_variance_sum:.3f} → {current_variance_sum:.3f}"
+                            f"Variance Δ: {prev_variance_sum:.3f} → {current_variance_sum:.3f}, "
+                            f"Next run ignore_ideal_pgcounts={last_ignore_ideal}"
                         )
                     else:
                         logging.info("No balance commands were generated")
