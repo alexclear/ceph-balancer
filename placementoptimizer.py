@@ -4564,6 +4564,7 @@ def list_highlight(osdlist, changepos, colorcode):
 def balance(args, cluster):
     logging.info("running pg balancer")
     start_time = time.time()  # Track start time for timeout
+    timeout_occurred = False  # Track if the loop exits due to timeout
 
     # this is basically my approach to OSDMap::calc_pg_upmaps
     # and a CrushWrapper::try_remap_rule python-implementation
@@ -4658,9 +4659,10 @@ def balance(args, cluster):
     found_remap = False
 
     while True:
-        # Check for timeout first
+        # Check for timeout first (modified to set timeout_occurred)
         if time.time() - start_time > 5:  # 5 second timeout
             logging.warning("Balancing timeout after 5 seconds, breaking loop")
+            timeout_occurred = True
             break
 
         if found_remap_count >= args.max_pg_moves:
@@ -4930,6 +4932,10 @@ def balance(args, cluster):
                 # end of to-loop
             # end of pg loop
         # end of from-loop
+
+    # After the balancing loop ends, adjust ignore_ideal_pgcounts based on timeout
+    args.ignore_ideal_pgcounts = "all" if timeout_occurred else "none"
+    logging.info(f"Next runs will ignore_ideal_pgcounts='{args.ignore_ideal_pgcounts}' due to {'timeout' if timeout_occurred else 'success'}")
 
     move_size, move_count = pg_mappings.get_remaps_shardsize_count()
 
