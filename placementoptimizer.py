@@ -4565,7 +4565,6 @@ def balance(args, cluster):
     logging.info("running pg balancer")
     start_time = time.time()  # Track start time for timeout
     timeout_occurred = False  # Track if the loop exits due to timeout
-
     # this is basically my approach to OSDMap::calc_pg_upmaps
     # and a CrushWrapper::try_remap_rule python-implementation
 
@@ -4934,9 +4933,9 @@ def balance(args, cluster):
         # end of from-loop
 
     # After the balancing loop ends, adjust ignore_ideal_pgcounts based on timeout
-    args.ignore_ideal_pgcounts = "all" if timeout_occurred else "none"
-    logging.info(f"Next runs will use ignore_ideal_pgcounts='{args.ignore_ideal_pgcounts}' due to {'timeout' if timeout_occurred else 'success'}")
-
+    new_ignore_ideal = "all" if timeout_occurred else "none"
+    logging.info(f"Next runs will use ignore_ideal_pgcounts='{new_ignore_ideal}' due to {'timeout' if timeout_occurred else 'success'}")
+    
     move_size, move_count = pg_mappings.get_remaps_shardsize_count()
 
     # generation performance
@@ -4975,6 +4974,9 @@ def balance(args, cluster):
         for cmd in pg_mappings.get_upmap_items_commands():
             outfd.write(cmd)
             outfd.write("\n")
+
+    # Return the new value to persist between runs
+    return new_ignore_ideal
 
 
 def show(args, cluster):
@@ -5554,7 +5556,7 @@ def main():
                     sys.stdout = StringIO()
 
                     try:
-                        balance(balance_args, state)
+                        last_ignore_ideal = balance(balance_args, state)
                         balance_output = sys.stdout.getvalue()
                     finally:
                         sys.stdout = old_stdout
@@ -5605,9 +5607,6 @@ def main():
                         current_analyzer = MappingAnalyzer()
                         current_mappings = PGMappings(state, analyzer=current_analyzer)
                         current_variance_sum = sum(current_analyzer.cluster_variance.values())
-
-                        # Update last_ignore_ideal for next run
-                        last_ignore_ideal = balance_args.ignore_ideal_pgcounts
 
                         logging.info(
                             f"Move cycle complete. Moves: {len(commands)}, "
