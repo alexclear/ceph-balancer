@@ -5518,6 +5518,10 @@ def main():
                     balance_args.pg_choice = "largest"
                     balance_args.ensure_variance_decrease = True         # Require measurable improvement
                     balance_args.ignore_pgsize_toolarge = False          # Filter non-viable moves
+                    balance_args.only_crushclass = None
+                    balance_args.source_osds = None
+                    balance_args.only_poolid = None
+                    balance_args.only_pool = None
                     balance_args.output = "-"
                     balance_output = ""
 
