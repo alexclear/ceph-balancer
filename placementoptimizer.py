@@ -5514,6 +5514,7 @@ def main():
                     balance_args.__dict__.update(vars(args))  # Copy existing args
 
                     balance_args.ignore_ideal_pgcounts = "none"          # Respect CRUSH PG counts
+                    balance_args.osdfrom = "alternate"
                     balance_args.ensure_variance_decrease = True         # Require measurable improvement
                     balance_args.ignore_pgsize_toolarge = False          # Filter non-viable moves
                     balance_args.output = "-"
