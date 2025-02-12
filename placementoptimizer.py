@@ -5502,10 +5502,14 @@ def main():
                         time.sleep(60)
                         continue
 
-                    # Load fresh cluster state
+                    # Load fresh cluster state with validation
                     logging.info("Refreshing cluster state...")
                     state = ClusterState()
                     state.preprocess()
+
+                    if not hasattr(state, 'get_pg_shardsize'):
+                        logging.error("Cluster state not initialized properly")
+                        raise RuntimeError("Invalid cluster state")
 
                     # Create fresh balance arguments with safety settings
                     class BalanceArgs:
@@ -5548,12 +5552,13 @@ def main():
                         for cmd in commands:
                             if 'pg-upmap-items' in cmd:
                                 pgid = cmd.split()[3]
-                                pg_sizes.append(cluster.get_pg_shardsize(pgid))
+                                pg_sizes.append(state.get_pg_shardsize(pgid))
 
                         # Get variance metrics
-                        analyzer = MappingAnalyzer()
-                        mappings = PGMappings(cluster, analyzer=analyzer)
-                        prev_variance = analyzer.get_cluster_variance()
+                        # Get variance metrics BEFORE moves
+                        prev_analyzer = MappingAnalyzer()
+                        prev_mappings = PGMappings(state, analyzer=prev_analyzer)
+                        prev_variance = prev_analyzer.get_cluster_variance()
 
                         logging.info(f"Executing {len(commands)} balance commands")
 
@@ -5574,10 +5579,14 @@ def main():
                             except subprocess.TimeoutExpired:
                                 logging.error("Command timed out")
 
-                        # Get updated variance after moves
-                        analyzer = MappingAnalyzer()
-                        mappings = PGMappings(cluster, analyzer=analyzer)
-                        current_variance = analyzer.get_cluster_variance()
+                        # Get variance AFTER moves - reload fresh state
+                        logging.info("Refreshing cluster state for post-move analysis...")
+                        state = ClusterState()
+                        state.preprocess()
+
+                        current_analyzer = MappingAnalyzer()
+                        current_mappings = PGMappings(state, analyzer=current_analyzer)
+                        current_variance = current_analyzer.get_cluster_variance()
 
                         logging.info(
                             f"Move cycle complete. Moves: {len(commands)}, "
