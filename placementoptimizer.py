@@ -5578,6 +5578,11 @@ def main():
                             except subprocess.TimeoutExpired:
                                 logging.error("Command timed out")
 
+                        # Let the cluster stabilize
+                        stabilization_sleep = max(120, args.sleep_timeout)  # Minimum 2 minutes
+                        logging.info(f"Sleeping for {stabilization_sleep}s to allow cluster stabilization")
+                        time.sleep(stabilization_sleep)
+
                         # Get variance AFTER moves - reload fresh state
                         logging.info("Refreshing cluster state for post-move analysis...")
                         state = ClusterState()
@@ -5594,11 +5599,6 @@ def main():
                         )
                     else:
                         logging.info("No balance commands were generated")
-
-                    # Let the cluster stabilize
-                    stabilization_sleep = max(120, args.sleep_timeout)  # Minimum 2 minutes
-                    logging.info(f"Sleeping for {stabilization_sleep}s to allow cluster stabilization")
-                    time.sleep(stabilization_sleep)
 
                 except Exception as e:
                     logging.error(f"Balance cycle failed: {str(e)}")
