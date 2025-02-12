@@ -36,12 +36,6 @@ from pprint import pformat, pprint
 from typing import Optional, Callable, Dict, List, Tuple
 
 
-if sys.stdout.encoding.lower() != 'utf-8':
-    sys.stdout.reconfigure(encoding='utf-8')
-
-if sys.stderr.encoding.lower() != 'utf-8':
-    sys.stderr.reconfigure(encoding='utf-8')
-
 def parse_args():
     cli = argparse.ArgumentParser()
 
@@ -4569,6 +4563,7 @@ def list_highlight(osdlist, changepos, colorcode):
 
 def balance(args, cluster):
     logging.info("running pg balancer")
+    start_time = time.time()  # Track start time for timeout
 
     # this is basically my approach to OSDMap::calc_pg_upmaps
     # and a CrushWrapper::try_remap_rule python-implementation
@@ -4663,6 +4658,11 @@ def balance(args, cluster):
     found_remap = False
 
     while True:
+        # Check for timeout first
+        if time.time() - start_time > 5:  # 5 second timeout
+            logging.warning("Balancing timeout after 5 seconds, breaking loop")
+            break
+
         if found_remap_count >= args.max_pg_moves:
             logging.info("enough remaps found")
             break
