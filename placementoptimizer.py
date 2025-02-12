@@ -5554,11 +5554,10 @@ def main():
                                 pgid = cmd.split()[3]
                                 pg_sizes.append(state.get_pg_shardsize(pgid))
 
-                        # Get variance metrics
                         # Get variance metrics BEFORE moves
                         prev_analyzer = MappingAnalyzer()
                         prev_mappings = PGMappings(state, analyzer=prev_analyzer)
-                        prev_variance = prev_analyzer.get_cluster_variance()
+                        prev_variance_sum = sum(prev_analyzer.cluster_variance.values())  # Sum variances from all crushclasses
 
                         logging.info(f"Executing {len(commands)} balance commands")
 
@@ -5586,12 +5585,12 @@ def main():
 
                         current_analyzer = MappingAnalyzer()
                         current_mappings = PGMappings(state, analyzer=current_analyzer)
-                        current_variance = current_analyzer.get_cluster_variance()
+                        current_variance_sum = sum(current_analyzer.cluster_variance.values())
 
                         logging.info(
                             f"Move cycle complete. Moves: {len(commands)}, "
                             f"Est. data moved: {sum(pg_sizes)/1024**3:.2f}GB, "
-                            f"Variance Δ: {prev_variance:.3f} → {current_variance:.3f}"
+                            f"Variance Δ: {prev_variance_sum:.3f} → {current_variance_sum:.3f}"
                         )
                     else:
                         logging.info("No balance commands were generated")
