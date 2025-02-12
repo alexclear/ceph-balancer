@@ -235,7 +235,7 @@ def log_setup(setting, default=1):
     factor = clamp(default + setting, 0, len(levels) - 1)
     level = levels[factor]
 
-    logging.basicConfig(level=level, format="[%(asctime)s] %(message)s")
+    logging.basicConfig(level=level, format="[%(asctime)s] [%(levelname)s] %(message)s", encoding='utf-8')
     logging.captureWarnings(True)
 
 
