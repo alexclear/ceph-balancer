@@ -5513,17 +5513,17 @@ def main():
                     balance_args = BalanceArgs()
                     balance_args.__dict__.update(vars(args))  # Copy existing args
 
-                    balance_args.ignore_ideal_pgcounts = "none"          # Respect CRUSH PG counts
+                    balance_args.ignore_ideal_pgcounts = "none"  # Respect CRUSH PG counts
                     balance_args.osdfrom = "alternate"
                     balance_args.pg_choice = "largest"
-                    balance_args.ensure_variance_decrease = True         # Require measurable improvement
-                    balance_args.ignore_pgsize_toolarge = False          # Filter non-viable moves
+                    balance_args.ensure_variance_decrease = True # Require measurable improvement
+                    balance_args.ignore_pgsize_toolarge = False  # Filter non-viable moves
                     balance_args.only_crushclass = None
                     balance_args.source_osds = None
                     balance_args.only_poolid = None
                     balance_args.only_pool = None
                     balance_args.ignore_target_usage = False
-                    balance_args.ensure_target_limits = False
+                    balance_args.ensure_target_limits = True     # Blocks movement if the target OSD would become the new limiting OSD for the pool's maximum available space
                     balance_args.save_timings = None
                     balance_args.ensure_optimal_moves = False
                     balance_args.output = "-"
