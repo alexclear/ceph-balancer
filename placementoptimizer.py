@@ -5507,22 +5507,16 @@ def main():
                     state = ClusterState()
                     state.preprocess()
 
-                    # Generate balance commands with the updated state
-                    balance_args = args
-                    balance_args.output = "-"  # Output to stdout for capturing
-                    balance_args.osdfrom = "alternate"  # Set default osdfrom method
-                    balance_args.pg_choice = "largest"  # Set default pg choice method
-                    balance_args.only_crushclass = None  # Set default crushclass filter
-                    balance_args.source_osds = None  # Set default source OSDs filter
-                    balance_args.only_poolid = None  # Set default pool filter
-                    balance_args.only_pool = None  # Set default pool filter
-                    balance_args.ignore_ideal_pgcounts = "all"  # Set default pgcount ignore mode
-                    balance_args.ignore_target_usage = False  # Set default target usage check
-                    balance_args.ensure_target_limits = False  # Set default target limits check
-                    balance_args.save_timings = None  # Set default save timings
-                    balance_args.ignore_pgsize_toolarge = False  # Set default pg size check
-                    balance_args.ensure_optimal_moves = False  # Set default optimal moves check
-                    balance_args.ensure_variance_decrease = False  # Set default variance decrease check
+                    # Create fresh balance arguments with safety settings
+                    class BalanceArgs:
+                        pass
+                    balance_args = BalanceArgs()
+                    balance_args.__dict__.update(vars(args))  # Copy existing args
+
+                    balance_args.ignore_ideal_pgcounts = "none"          # Respect CRUSH PG counts
+                    balance_args.ensure_variance_decrease = True         # Require measurable improvement
+                    balance_args.ignore_pgsize_toolarge = False          # Filter non-viable moves
+                    balance_args.output = "-"
                     balance_output = ""
 
                     # Generate and execute balance commands
@@ -5530,7 +5524,7 @@ def main():
                     import sys
                     old_stdout = sys.stdout
                     sys.stdout = StringIO()
-                    
+
                     try:
                         balance(balance_args, state)
                         balance_output = sys.stdout.getvalue()
@@ -5539,6 +5533,18 @@ def main():
 
                     if balance_output.strip():
                         commands = [cmd.strip() for cmd in balance_output.splitlines() if cmd.strip()]
+                        # Calculate estimated data moved
+                        pg_sizes = []
+                        for cmd in commands:
+                            if 'pg-upmap-items' in cmd:
+                                pgid = cmd.split()[3]
+                                pg_sizes.append(cluster.get_pg_shardsize(pgid))
+
+                        # Get variance metrics
+                        analyzer = MappingAnalyzer()
+                        mappings = PGMappings(cluster, analyzer=analyzer)
+                        prev_variance = analyzer.get_cluster_variance()
+
                         logging.info(f"Executing {len(commands)} balance commands")
 
                         for cmd in commands:
@@ -5557,6 +5563,17 @@ def main():
                                 logging.error(f"Command failed (code {e.returncode}):\nSTDERR:\n{e.stderr}\nSTDOUT:\n{e.stdout}")
                             except subprocess.TimeoutExpired:
                                 logging.error("Command timed out")
+
+                        # Get updated variance after moves
+                        analyzer = MappingAnalyzer()
+                        mappings = PGMappings(cluster, analyzer=analyzer)
+                        current_variance = analyzer.get_cluster_variance()
+
+                        logging.info(
+                            f"Move cycle complete. Moves: {len(commands)}, "
+                            f"Est. data moved: {sum(pg_sizes)/1024**3:.2f}GB, "
+                            f"Variance Δ: {prev_variance:.3f} → {current_variance:.3f}"
+                        )
                     else:
                         logging.info("No balance commands were generated")
 
