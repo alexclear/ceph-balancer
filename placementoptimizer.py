@@ -5522,6 +5522,10 @@ def main():
                     balance_args.source_osds = None
                     balance_args.only_poolid = None
                     balance_args.only_pool = None
+                    balance_args.ignore_target_usage = False
+                    balance_args.ensure_target_limits = False
+                    balance_args.save_timings = None
+                    balance_args.ensure_optimal_moves = False
                     balance_args.output = "-"
                     balance_output = ""
 
