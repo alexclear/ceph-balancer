@@ -36,6 +36,12 @@ from pprint import pformat, pprint
 from typing import Optional, Callable, Dict, List, Tuple
 
 
+if sys.stdout.encoding.lower() != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
+
+if sys.stderr.encoding.lower() != 'utf-8':
+    sys.stderr.reconfigure(encoding='utf-8')
+
 def parse_args():
     cli = argparse.ArgumentParser()
 
@@ -235,7 +241,7 @@ def log_setup(setting, default=1):
     factor = clamp(default + setting, 0, len(levels) - 1)
     level = levels[factor]
 
-    logging.basicConfig(level=level, format="[%(asctime)s] [%(levelname)s] %(message)s", encoding='utf-8')
+    logging.basicConfig(level=level, format="[%(asctime)s] [%(levelname)s] %(message)s")
     logging.captureWarnings(True)
 
 
