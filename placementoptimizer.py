@@ -4584,6 +4584,10 @@ class LoopDetector:
         self.state_hashes = set()
         self.variance_window = deque(maxlen=5)
         self.move_count = 0
+        self.loop_iterations = 0
+
+    def increment_loop_iteration(self):
+        self.loop_iterations += 1
 
     def record_move(self, src, dest, pgid):
         self.move_history.append( (src, dest, pgid) )
@@ -4660,11 +4664,6 @@ def balance(args, cluster):
     start_time = time.time()
     detector = LoopDetector()
 
-    # Check for global timeout
-    elapsed_time = time.time() - start_time
-    if elapsed_time > args.global_timeout:
-        logging.warning(f"Global timeout of {args.global_timeout}s reached - breaking loop")
-        break
     # this is basically my approach to OSDMap::calc_pg_upmaps
     # and a CrushWrapper::try_remap_rule python-implementation
 
@@ -4758,8 +4757,45 @@ def balance(args, cluster):
     found_remap = False
 
     while True:
+        detector.increment_loop_iteration()
+        
         # Check for termination conditions
         current_var = sum(analyzer.cluster_variance.values())
+
+        # Check for global timeout
+        elapsed_time = time.time() - start_time
+        if elapsed_time > args.global_timeout:
+            logging.warning(f"Global timeout of {args.global_timeout}s reached after {detector.loop_iterations} iterations")
+
+            # Log full state details
+            logging.info("Cluster state at timeout:")
+            logging.info(f"  Move count: {detector.move_count}")
+            logging.info(f"  Variance: {sum(analyzer.cluster_variance.values()):.3f}")
+            logging.info(f"  OSD count: {len(cluster.osds)}")
+                
+            # Log crush class usage
+            for crushclass, usage in sorted(cluster.crushclasses_usage.items(), key=lambda x: x[1]['percent_used'], reverse=True):
+                logging.info(f"  {crushclass}")
+                logging.info(f"    fill avg: {usage['fill_average']:3.2f}%")
+                logging.info(f"    usage: {usage['percent_used']:3.2f}%")
+                logging.info(f"    min: {usage['osd_min_used']:3.2f}% on osd.{usage['osd_min']}")
+                logging.info(f"    max: {usage['osd_max_used']:3.2f}% on osd.{usage['osd_max']}")
+                logging.info(f"    median: {usage['osd_median_used']:3.2f}% on osd.{usage['osd_median']}")
+                logging.info(f"    osd_count: {usage['osd_count']}")
+                logging.info()
+
+            if detector.has_cycle():
+                logging.warning("Detected movement cycles between OSDs:")
+                for o1, o2, pgid in detector.move_history:
+                    logging.warning(f"  osd.{o1} <-> osd.{o2} for pg {pgid}")
+
+            if detector.variance_stagnant(current_var):
+                logging.warning("Variance is stagnant")
+                logging.info(f"  Current variance: {current_var:.6f}")
+                logging.info(f"  Recent variance changes: {list(detector.variance_window) if detector.variance_window else []}")
+
+            # Cancel the loop
+            break
 
         # State fingerprint check
         if detector.record_state(pg_mappings, detector.move_count):
