@@ -4631,16 +4631,26 @@ class LoopDetector:
 
     def record_state(self, mappings, move_count=None):
         """Track cluster state fingerprints to detect repeats"""
+        # Only start tracking after the first state
+        if len(self.state_hashes) == 0:
+            utils = [round(mappings.get_osd_usage(osd), 2)
+                    for osd in sorted(mappings.osd_candidates)]  # Ensure consistent ordering
+            initial_hash = hashlib.sha256(str(utils).encode()).hexdigest()
+            self.state_hashes.add(initial_hash)
+            return False
+
         utils = [round(mappings.get_osd_usage(osd), 2)
                 for osd in sorted(mappings.osd_candidates)]  # Ensure consistent ordering
-        state_hash = hashlib.sha256(str(utils).encode()).hexdigest()
-        if state_hash in self.state_hashes:
+        current_hash = hashlib.sha256(str(utils).encode()).hexdigest()
+
+        if current_hash in self.state_hashes:
             state_count = len(self.state_hashes)
             loop_iter = move_count if move_count is not None else None
-            logging.warning(f"Detected repeated cluster state (hashes: {state_count}) on move #{loop_iter if loop_iter is not None else 'N/A'}: {state_hash}")
+            logging.warning(f"Detected repeated cluster state (hashes: {state_count}) on move #{loop_iter if loop_iter is not None else 'N/A'}: {current_hash}")
             return True
-        self.state_hashes.add(state_hash)
-        return False
+        else:
+            self.state_hashes.add(current_hash)
+            return False
 
 def balance(args, cluster):
     logging.info("running pg balancer")
