@@ -34,7 +34,17 @@ import uuid
 from enum import Enum
 from collections import defaultdict
 from functools import lru_cache
-from itertools import chain, zip_longest, pairwise
+try:
+    from itertools import pairwise  # Python 3.10+
+except ImportError:
+    # Backported from Python 3.10 for compatibility
+    from itertools import tee
+    def pairwise(iterable):
+        a, b = tee(iterable)
+        next(b, None)
+        return zip(a, b)
+
+from itertools import chain, zip_longest
 from pprint import pformat, pprint
 from typing import Optional, Callable, Dict, List, Tuple
 
