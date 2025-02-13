@@ -4580,6 +4580,7 @@ class LoopDetector:
         self.osd_map = {}
         self.state_hashes = set()
         self.variance_window = deque(maxlen=5)
+        self.move_count = 0
 
     def record_move(self, src, dest, pgid):
         self.move_history.append( (src, dest, pgid) )
@@ -4628,12 +4629,15 @@ class LoopDetector:
         deltas = [abs(a-b) for a,b in pairwise(self.variance_window)]
         return statistics.mean(deltas) < 0.01  # 1% threshold for stagnation
 
-    def record_state(self, mappings):
+    def record_state(self, mappings, move_count=None):
         """Track cluster state fingerprints to detect repeats"""
         utils = [round(mappings.get_osd_usage(osd), 2)
                 for osd in sorted(mappings.osd_candidates)]  # Ensure consistent ordering
         state_hash = hashlib.sha256(str(utils).encode()).hexdigest()
         if state_hash in self.state_hashes:
+            state_count = len(self.state_hashes)
+            loop_iter = move_count if move_count is not None else None
+            logging.warning(f"Detected repeated cluster state (hashes: {state_count}) on move #{loop_iter if loop_iter is not None else 'N/A'}: {state_hash}")
             return True
         self.state_hashes.add(state_hash)
         return False
@@ -4739,7 +4743,7 @@ def balance(args, cluster):
         current_var = sum(analyzer.cluster_variance.values())
 
         # State fingerprint check
-        if detector.record_state(pg_mappings):
+        if detector.record_state(pg_mappings, detector.move_count):
             logging.warning("Detected repeated cluster state - breaking loop")
             break
 
@@ -4750,9 +4754,14 @@ def balance(args, cluster):
             logging.warning("Variance stagnant with move cycles - breaking loop")
             break
 
-        # Track move attempts to prevent timeout from resetting
-        moveAttempts = 0
-        # Maximum time between move attempts
+        # Persistent move attempt counter
+        # Track move count for timeout calculation
+        detector.move_count += 1
+        if detector.move_count > 1:
+            moveAttempts = detector.move_count
+        else:
+            moveAttempts = 0
+        # Calculate timeout with exponential backoff
         timeout_base = max(15, 30 * math.log(moveAttempts + 1))  # Seconds (minimum 15s)
         if time.time() - start_time > timeout_base:
             logging.warning(f"Timeout after {timeout_base:.1f}s - breaking loop")
