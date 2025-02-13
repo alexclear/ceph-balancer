@@ -4750,8 +4750,10 @@ def balance(args, cluster):
             logging.warning("Variance stagnant with move cycles - breaking loop")
             break
 
-        # Final timeout fallback
-        timeout_base = 30 * math.log(found_remap_count +1)  # Seconds
+        # Track move attempts to prevent timeout from resetting
+        moveAttempts = 0
+        # Maximum time between move attempts
+        timeout_base = max(15, 30 * math.log(moveAttempts + 1))  # Seconds (minimum 15s)
         if time.time() - start_time > timeout_base:
             logging.warning(f"Timeout after {timeout_base:.1f}s - breaking loop")
             break
@@ -4769,9 +4771,11 @@ def balance(args, cluster):
         found_remap = False
         unsuccessful_pools = set()
         last_attempt = -1
+        moveAttempts = 0  # Track move attempts for timeout calculation
 
         # try to move the biggest pg from the fullest disk to the next suiting smaller disk
         for osd_from, osd_from_used_percent in pg_mappings.get_osd_from_candidates():
+            moveAttempts += 1  # Increment move attempt counter
             if found_remap or force_finish:
                 break
 
