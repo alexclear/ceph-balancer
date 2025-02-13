@@ -4767,32 +4767,85 @@ def balance(args, cluster):
         if elapsed_time > args.global_timeout:
             logging.warning(f"Global timeout of {args.global_timeout}s reached after {detector.loop_iterations} iterations")
 
-            # Log full state details
-            logging.info("Cluster state at timeout:")
-            logging.info(f"  Move count: {detector.move_count}")
-            logging.info(f"  Variance: {sum(analyzer.cluster_variance.values()):.3f}")
-            logging.info(f"  OSD count: {len(cluster.osds)}")
-                
-            # Log crush class usage
-            for crushclass, usage in sorted(cluster.crushclasses_usage.items(), key=lambda x: x[1]['percent_used'], reverse=True):
-                logging.info(f"  {crushclass}")
-                logging.info(f"    fill avg: {usage['fill_average']:3.2f}%")
-                logging.info(f"    usage: {usage['percent_used']:3.2f}%")
-                logging.info(f"    min: {usage['osd_min_used']:3.2f}% on osd.{usage['osd_min']}")
-                logging.info(f"    max: {usage['osd_max_used']:3.2f}% on osd.{usage['osd_max']}")
-                logging.info(f"    median: {usage['osd_median_used']:3.2f}% on osd.{usage['osd_median']}")
-                logging.info(f"    osd_count: {usage['osd_count']}")
-                logging.info()
+            # Collect detailed debug information
+            logging.info("\n\n==== Detailed State Before Timeout ====")
 
-            if detector.has_cycle():
-                logging.warning("Detected movement cycles between OSDs:")
-                for o1, o2, pgid in detector.move_history:
-                    logging.warning(f"  osd.{o1} <-> osd.{o2} for pg {pgid}")
+            # Print current state
+            logging.info("Time elapsed: %.2fs", elapsed_time)
+            logging.info("Move count: %d", found_remap_count)
+            logging.info("Variance: %.3f", current_var)
+            logging.info("Move attempts: %d", moveAttempts)
+            logging.info("Loop iterations: %d", detector.loop_iterations)
 
-            if detector.variance_stagnant(current_var):
-                logging.warning("Variance is stagnant")
-                logging.info(f"  Current variance: {current_var:.6f}")
-                logging.info(f"  Recent variance changes: {list(detector.variance_window) if detector.variance_window else []}")
+            # Print OSD information
+            logging.info("\nOSD Details:")
+            logging.info("OSD count: %d", len(cluster.osds))
+            pp = pprint.PrettyPrinter(indent=2, width=200)
+            for osdid, osd in cluster.osds.items():
+                if osdid == -1:
+                    continue
+                info = {
+                    'osdid': osdid,
+                    'crush_class': osd.get('crush_class'),
+                    'device_size': pformatsize(osd.get('device_size')),
+                    'device_used': pformatsize(osd.get('device_used')),
+                    'used_percent': f"{osd.get('used_percent', 0.0):.1f}%",
+                    'host_name': osd.get('host_name'),
+                    'state': osd.get('state'),
+                    'laggy_probability': osd.get('laggy_probability'),
+                    'features': osd.get('features')
+                }
+                logging.info(pp.pformat(info))
+
+            # Print pool information
+            logging.info("\nPool Details:")
+            for poolid, pool in cluster.pools.items():
+                info = {
+                    'poolid': poolid,
+                    'name': pool['name'],
+                    'type': pool['repl_type'],
+                    'size': pool['size'],
+                    'min_size': pool['min_size'],
+                    'pg_num': pool['pg_num'],
+                    'stored': pformatsize(pool['stored']),
+                    'used': pformatsize(pool['used']),
+                    'used_percent': f"{pool['percent_used']:.1f}%",
+                    'crush_rule': pool['crush_rule'],
+                    'erasure_code_profile': pool.get('erasure_code_profile')
+                }
+                logging.info(pp.pformat(info))
+
+            # Print crush class usage
+            logging.info("\nCrush Class Usage:")
+            for crushclass, usage in analyzer.crushclass_usages.items():
+                info = {
+                    'crushclass': crushclass,
+                    'fill_average': f"{usage.fill_average:.1f}%",
+                    'usage_percent': f"{usage.usage_percent:.1f}%",
+                    'min': f"osd.{usage.osd_min} ({usage.osd_min_used:.1f}%)",
+                    'max': f"osd.{usage.osd_max} ({usage.osd_max_used:.1f}%)",
+                    'median': f"osd.{usage.osd_median} ({usage.osd_median_used:.1f}%)",
+                    'osd_count': usage.osd_count
+                }
+                logging.info(pp.pformat(info))
+
+            # Print move history details
+            logging.info("\nMove History:")
+            pp.pprint(detector.move_history)
+
+            # Print analyzer contents
+            logging.info("\nAnalyzer Contents:")
+            pp.pprint(analyzer.__dict__)
+
+            # Print mappings contents
+            logging.info("\nMappings Contents:")
+            pp.pprint(pg_mappings.__dict__)
+
+            # Print detector contents
+            logging.info("\nDetector Contents:")
+            pp.pprint(detector.__dict__)
+
+            logging.info("================ End of Timeout Debug =================\n")
 
             # Cancel the loop
             break
