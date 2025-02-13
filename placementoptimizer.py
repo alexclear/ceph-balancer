@@ -52,6 +52,9 @@ from typing import Optional, Callable, Dict, List, Tuple
 def parse_args():
     cli = argparse.ArgumentParser()
 
+    cli.add_argument('--global-timeout', '-t', type=int, default=15,
+                     help='global timeout for the balancing process in seconds (default: 15)')
+
     cli.add_argument("-v", "--verbose", action="count", default=0,
                      help="increase program verbosity")
     cli.add_argument("-q", "--quiet", action="count", default=0,
@@ -4656,6 +4659,12 @@ def balance(args, cluster):
     logging.info("running pg balancer")
     start_time = time.time()
     detector = LoopDetector()
+
+    # Check for global timeout
+    elapsed_time = time.time() - start_time
+    if elapsed_time > args.global_timeout:
+        logging.warning(f"Global timeout of {args.global_timeout}s reached - breaking loop")
+        break
     # this is basically my approach to OSDMap::calc_pg_upmaps
     # and a CrushWrapper::try_remap_rule python-implementation
 
