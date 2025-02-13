@@ -13,6 +13,9 @@ import argparse
 import binascii
 import datetime
 import itertools
+import hashlib
+import math
+from collections import deque
 from http.server import HTTPServer
 import io
 import json
@@ -4561,10 +4564,49 @@ def list_highlight(osdlist, changepos, colorcode):
     return f"[{', '.join(ret)}]"
 
 
+class LoopDetector:
+    def __init__(self, window_size=10):
+        self.move_history = deque(maxlen=window_size)  # (src_osd, dest_osd, pgid)
+        self.state_hashes = set()
+        self.variance_window = deque(maxlen=5)
+
+    def record_move(self, src, dest, pgid):
+        self.move_history.append( (src, dest, pgid) )
+
+    def has_cycle(self):
+        """Detects repeating move sequences"""
+        if len(self.move_history) < 4: return False
+
+        # Look for A→B→A patterns
+        seq = ''.join(f"{src}-{dest}"
+                    for src,dest,_ in self.move_history)
+        return any(seq.count(pattern) >=2
+                  for pattern in ['AB', 'BCA', 'ACB'])
+
+    def variance_stagnant(self, current_var):
+        """Check if variance is changing significantly"""
+        self.variance_window.append(current_var)
+        if len(self.variance_window) < 2:
+            return False
+
+        deltas = [abs(a-b) for a,b in zip(self.variance_window, self.variance_window[1:])]
+        avg_delta = sum(deltas)/len(deltas)
+        return avg_delta < 0.01  # 1% change threshold
+
+    def record_state(self, mappings):
+        """Track cluster state fingerprints"""
+        utils = sorted(round(mappings.get_osd_usage(osd), 2)
+                      for osd in mappings.osd_candidates)
+        state_hash = hashlib.sha256(str(utils).encode()).hexdigest()
+        if state_hash in self.state_hashes:
+            return True
+        self.state_hashes.add(state_hash)
+        return False
+
 def balance(args, cluster):
     logging.info("running pg balancer")
-    start_time = time.time()  # Track start time for timeout
-    timeout_occurred = False  # Track if the loop exits due to timeout
+    start_time = time.time()
+    detector = LoopDetector()
     # this is basically my approach to OSDMap::calc_pg_upmaps
     # and a CrushWrapper::try_remap_rule python-implementation
 
@@ -4658,10 +4700,25 @@ def balance(args, cluster):
     found_remap = False
 
     while True:
-        # Check for timeout first (modified to set timeout_occurred)
-        if time.time() - start_time > 5:  # 5 second timeout
-            logging.warning("Balancing timeout after 5 seconds, breaking loop")
-            timeout_occurred = True
+        # Check for termination conditions
+        current_var = sum(analyzer.cluster_variance.values())
+
+        # State fingerprint check
+        if detector.record_state(pg_mappings):
+            logging.warning("Detected repeated cluster state - breaking loop")
+            break
+
+        # Variance stagnation + cycle detection
+        if (detector.variance_stagnant(current_var) and
+            detector.has_cycle() and
+            found_remap_count > len(pg_mappings.osd_candidates)*1.5):
+            logging.warning("Variance stagnant with move cycles - breaking loop")
+            break
+
+        # Final timeout fallback
+        timeout_base = 30 * math.log(found_remap_count +1)  # Seconds
+        if time.time() - start_time > timeout_base:
+            logging.warning(f"Timeout after {timeout_base:.1f}s - breaking loop")
             break
 
         if found_remap_count >= args.max_pg_moves:
@@ -4895,6 +4952,9 @@ def balance(args, cluster):
                     if not move_ok:
                         raise RuntimeError(f'failed to move pg {move_pg} from osd.{osd_from}: {msg}')
 
+                    # Track move for cycle detection
+                    detector.record_move(osd_from, osd_to, move_pg)
+
                     if args.save_timings:
                         analysis_start = time.time()
                         move_calc_times[len(move_calc_times)] = time.time() - move_calc_start - analysis_duration
@@ -4932,9 +4992,9 @@ def balance(args, cluster):
             # end of pg loop
         # end of from-loop
 
-    # After the balancing loop ends, adjust ignore_ideal_pgcounts based on timeout
-    new_ignore_ideal = "all" if timeout_occurred else "none"
-    logging.info(f"Next runs will use ignore_ideal_pgcounts='{new_ignore_ideal}' due to {'timeout' if timeout_occurred else 'success'}")
+    # After the balancing loop ends, adjust ignore_ideal_pgcounts based on termination reason
+    new_ignore_ideal = "all" if found_remap_count == 0 else "none"
+    logging.info(f"Next runs will use ignore_ideal_pgcounts='{new_ignore_ideal}'")
     
     move_size, move_count = pg_mappings.get_remaps_shardsize_count()
 
