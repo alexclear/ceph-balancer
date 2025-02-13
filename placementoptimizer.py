@@ -4632,7 +4632,7 @@ class LoopDetector:
     def record_state(self, mappings, move_count=None):
         """Track cluster state fingerprints to detect repeats"""
         # Only start tracking after the first state
-        if len(self.state_hashes) == 0:
+        if len(self.state_hashes) < 2:  # Ignore initial states
             utils = [round(mappings.get_osd_usage(osd), 2)
                     for osd in sorted(mappings.osd_candidates)]  # Ensure consistent ordering
             initial_hash = hashlib.sha256(str(utils).encode()).hexdigest()
