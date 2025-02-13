@@ -34,7 +34,7 @@ import uuid
 from enum import Enum
 from collections import defaultdict
 from functools import lru_cache
-from itertools import chain, zip_longest
+from itertools import chain, zip_longest, pairwise
 from pprint import pformat, pprint
 from typing import Optional, Callable, Dict, List, Tuple
 
@@ -4566,37 +4566,62 @@ def list_highlight(osdlist, changepos, colorcode):
 
 class LoopDetector:
     def __init__(self, window_size=10):
-        self.move_history = deque(maxlen=window_size)  # (src_osd, dest_osd, pgid)
+        self.move_history = deque(maxlen=window_size)
+        self.osd_map = {}
         self.state_hashes = set()
         self.variance_window = deque(maxlen=5)
 
     def record_move(self, src, dest, pgid):
         self.move_history.append( (src, dest, pgid) )
 
-    def has_cycle(self):
-        """Detects repeating move sequences"""
-        if len(self.move_history) < 4: return False
+    def _update_osd_map(self):
+        all_osds = {src for src, _, _ in self.move_history} | {dest for _, dest, _ in self.move_history}
+        new_osds = sorted(osd for osd in all_osds if osd not in self.osd_map)
 
-        # Look for A→B→A patterns
-        seq = ''.join(f"{src}-{dest}"
-                    for src,dest,_ in self.move_history)
-        return any(seq.count(pattern) >=2
-                  for pattern in ['AB', 'BCA', 'ACB'])
+        # Create unique letter mappings for new OSDs
+        base = 65  # ASCII 'A'
+        count = len(self.osd_map)
+        for i, osd in enumerate(new_osds, count):
+            if i < 26:
+                self.osd_map[osd] = chr(base + i)
+            else:
+                # Handle clusters with >26 OSDs using AA, AB, ..., BA, BB...
+                high = (i // 26) - 1
+                low = i % 26
+                self.osd_map[osd] = chr(base + high) + chr(base + low)
+
+    def has_cycle(self):
+        """Detects movement patterns indicating infinite loops using mapped OSD letters"""
+        self._update_osd_map()
+
+        # Generate sequence of mapped OSD transitions
+        transition_seq = []
+        for src, dest, _ in self.move_history:
+            transition_seq.append(f"{self.osd_map[src]}{self.osd_map[dest]}")
+
+        full_sequence = ''.join(transition_seq)
+
+        # Check for fundamental movement cycles
+        patterns = (
+            'ABAB',    # Immediate ping-pong
+            'ABCA',    # Triangular cycle
+            'ABBACCA'  # Complex oscillation
+        )
+        return any(full_sequence.count(p) >= 1 for p in patterns)
 
     def variance_stagnant(self, current_var):
-        """Check if variance is changing significantly"""
+        """Check if variance changes have stagnated using a moving window"""
         self.variance_window.append(current_var)
         if len(self.variance_window) < 2:
             return False
-
-        deltas = [abs(a-b) for a,b in zip(self.variance_window, self.variance_window[1:])]
-        avg_delta = sum(deltas)/len(deltas)
-        return avg_delta < 0.01  # 1% change threshold
+        # Calculate mean absolute difference between consecutive variance values
+        deltas = [abs(a-b) for a,b in pairwise(self.variance_window)]
+        return statistics.mean(deltas) < 0.01  # 1% threshold for stagnation
 
     def record_state(self, mappings):
-        """Track cluster state fingerprints"""
-        utils = sorted(round(mappings.get_osd_usage(osd), 2)
-                      for osd in mappings.osd_candidates)
+        """Track cluster state fingerprints to detect repeats"""
+        utils = [round(mappings.get_osd_usage(osd), 2)
+                for osd in sorted(mappings.osd_candidates)]  # Ensure consistent ordering
         state_hash = hashlib.sha256(str(utils).encode()).hexdigest()
         if state_hash in self.state_hashes:
             return True
