@@ -4278,7 +4278,8 @@ class CrushclassUsage:
                  osd_median,
                  osd_median_used,
                  osd_max,
-                 osd_max_used):
+                 osd_max_used,
+                 osd_count):
 
         self.fill_average: float = fill_average
         self.usage_percent: float = usage_percent
@@ -4288,6 +4289,7 @@ class CrushclassUsage:
         self.osd_median_used: float = osd_median_used
         self.osd_max: int = osd_max
         self.osd_max_used: float = osd_max_used
+        self.osd_count: int = osd_count
 
 
 class MappingAnalyzer:
@@ -4446,6 +4448,7 @@ class MappingAnalyzer:
                 osd_median_used=osd_median_used,
                 osd_max=osd_max,
                 osd_max_used=osd_max_used,
+                osd_count=len(cc_osd_usages)
             )
 
             if self.save_file:
