@@ -45,7 +45,8 @@ except ImportError:
         return zip(a, b)
 
 from itertools import chain, zip_longest
-from pprint import pformat, pprint
+from pprint import pformat, PrettyPrinter
+import pprint
 from typing import Optional, Callable, Dict, List, Tuple
 
 
@@ -4780,7 +4781,7 @@ def balance(args, cluster):
             # Print OSD information
             logging.info("\nOSD Details:")
             logging.info("OSD count: %d", len(cluster.osds))
-            pp = pprint.PrettyPrinter(indent=2, width=200)
+            pp = PrettyPrinter(indent=2, width=200)
             for osdid, osd in cluster.osds.items():
                 if osdid == -1:
                     continue
