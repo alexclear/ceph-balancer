@@ -5199,7 +5199,7 @@ def balance(args, cluster):
     with open_or_stdout(args.output, "w") as outfd:
         for cmd in valid_commands:
             # Validate command format strictly
-            if cmd.startswith('ceph osd pg-upmap-items ') or cmd.startswith('ceph osd rm-pg-upmap-items '):
+            if cmd.startswith('ceph osd'):
                 outfd.write(cmd + "\n")
             else:
                 logging.warning(f"Skipping invalid command format: {cmd}")
@@ -5790,23 +5790,28 @@ def main():
                     finally:
                         sys.stdout = old_stdout
 
-                    if balance_output.strip():
-                        commands = [cmd.strip() for cmd in balance_output.splitlines() if cmd.strip()]
-                        # Calculate estimated data moved
+                    # Filter commands BEFORE checking output
+                    valid_commands = [
+                        cmd.strip() for cmd in balance_output.splitlines() 
+                        if cmd.startswith('ceph osd')
+                    ]
+
+                    if valid_commands:  # Check if there are ANY valid commands
                         pg_sizes = []
-                        for cmd in commands:
+                        # Execute filtered commands
+                        for cmd in valid_commands:
                             if 'pg-upmap-items' in cmd:
                                 pgid = cmd.split()[3]
                                 pg_sizes.append(state.get_pg_shardsize(pgid))
-
+                                
                         # Get variance metrics BEFORE moves
                         prev_analyzer = MappingAnalyzer()
                         prev_mappings = PGMappings(state, analyzer=prev_analyzer)
                         prev_variance_sum = sum(prev_analyzer.cluster_variance.values())  # Sum variances from all crushclasses
 
-                        logging.info(f"Executing {len(commands)} balance commands")
+                        logging.info(f"Executing {len(valid_commands)} balance commands")
 
-                        for cmd in commands:
+                        for cmd in valid_commands:
                             try:
                                 logging.info(f"Running: {cmd}")
                                 result = subprocess.run(
@@ -5838,7 +5843,7 @@ def main():
                         current_variance_sum = sum(current_analyzer.cluster_variance.values())
 
                         logging.info(
-                            f"Move cycle complete. Moves: {len(commands)}, "
+                            f"Move cycle complete. Moves: {len(valid_commands)}, "
                             f"Est. data moved: {sum(pg_sizes)/1024**3:.2f}GB, "
                             f"Variance Δ: {prev_variance_sum:.3f} → {current_variance_sum:.3f}, "
                             f"Next run ignore_ideal_pgcounts={last_ignore_ideal}"
