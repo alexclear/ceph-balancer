@@ -4838,8 +4838,12 @@ def balance(args, cluster):
                 logging.info(pp.pformat(info))
 
             # Print move history details
-            logging.info("\nMove History:")
-            pp.pprint(detector.move_history)
+            logging.info("\nLast 25 moves:")
+            if detector.move_history:
+                for src, dest, pgid in list(detector.move_history)[-25:]:
+                    logging.info(f"osd.{src} -> osd.{dest} ({pgid})")
+            else:
+                logging.info("No moves recorded")
 
             # Print analyzer contents
             logging.info("\nAnalyzer Contents:")
