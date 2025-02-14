@@ -4586,7 +4586,7 @@ def list_highlight(osdlist, changepos, colorcode):
 
 
 class LoopDetector:
-    def __init__(self, window_size=10):
+    def __init__(self, window_size=100):  # Increased window size to track more moves
         self.move_history = deque(maxlen=window_size)
         self.osd_map = {}
         self.state_hashes = set()
@@ -4844,6 +4844,11 @@ def balance(args, cluster):
                     logging.info(f"osd.{src} -> osd.{dest} ({pgid})")
             else:
                 logging.info("No moves recorded")
+
+            # Print full move history for debugging
+            logging.info("\nFull move history:")
+            for src, dest, pgid in detector.move_history:
+                logging.info(f"osd.{src} -> osd.{dest} ({pgid})")
 
             # Print analyzer contents
             logging.info("\nAnalyzer Contents:")
