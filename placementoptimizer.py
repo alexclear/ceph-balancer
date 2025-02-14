@@ -252,7 +252,11 @@ def log_setup(setting, default=1):
     factor = clamp(default + setting, 0, len(levels) - 1)
     level = levels[factor]
 
-    logging.basicConfig(level=level, format="[%(asctime)s] [%(levelname)s] %(message)s")
+    logging.basicConfig(
+        level=level,
+        format="[%(asctime)s] [%(levelname)s] %(message)s",
+        handlers=[logging.StreamHandler(sys.stderr)]  # Direct logs to stderr
+    )
     logging.captureWarnings(True)
 
 
@@ -5191,13 +5195,14 @@ def balance(args, cluster):
 
     # Only write valid commands to output
     valid_commands = list(pg_mappings.get_upmap_items_commands())
-    
+
     with open_or_stdout(args.output, "w") as outfd:
         for cmd in valid_commands:
-            if cmd.startswith('ceph osd'):
+            # Validate command format strictly
+            if cmd.startswith('ceph osd pg-upmap-items ') or cmd.startswith('ceph osd rm-pg-upmap-items '):
                 outfd.write(cmd + "\n")
             else:
-                logging.warning(f"Skipping invalid command pattern: {cmd}")
+                logging.warning(f"Skipping invalid command format: {cmd}")
 
     # Return the new value to persist between runs
     return new_ignore_ideal
