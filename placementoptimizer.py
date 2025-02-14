@@ -5189,11 +5189,15 @@ def balance(args, cluster):
 
     logging.info(80*"-")
 
-    # return what we have been waiting for :)
+    # Only write valid commands to output
+    valid_commands = list(pg_mappings.get_upmap_items_commands())
+    
     with open_or_stdout(args.output, "w") as outfd:
-        for cmd in pg_mappings.get_upmap_items_commands():
-            outfd.write(cmd)
-            outfd.write("\n")
+        for cmd in valid_commands:
+            if cmd.startswith('ceph osd'):
+                outfd.write(cmd + "\n")
+            else:
+                logging.warning(f"Skipping invalid command pattern: {cmd}")
 
     # Return the new value to persist between runs
     return new_ignore_ideal
