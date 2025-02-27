@@ -19,3 +19,4 @@ RUN pip3 install -r /tmp/requirements.txt
 
 COPY placementoptimizer.py /usr/local/bin/placementoptimizer
 RUN chmod +x /usr/local/bin/placementoptimizer
+
