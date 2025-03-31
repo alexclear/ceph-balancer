@@ -109,7 +109,7 @@ def parse_args():
     savemappingp.add_argument("--save-mappings", help="filename to store the resulting up osdid set for all pgs (to see where things are placed)")
 
     # HTTP metrics server
-    servesp = sp.add_parser('serve', parents=[statep, upmapp, osdsizep, usedestimatep, savemappingp],
+    servesp = sp.add_parser('serve', parents=[cephcmdp, statep, upmapp, osdsizep, usedestimatep, savemappingp],
                            help="run prometheus metrics HTTP server")
     servesp.add_argument('--port', type=int, default=9098,
                         help="HTTP server port (default: %(default)s)")
