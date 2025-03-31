@@ -17,6 +17,14 @@ RUN yum install -y python3 python3-pip
 COPY requirements.txt /tmp/
 RUN pip3 install -r /tmp/requirements.txt
 
-COPY placementoptimizer.py /usr/local/bin/placementoptimizer
-RUN chmod +x /usr/local/bin/placementoptimizer
+# Copy the entire package structure
+COPY . /tmp/ceph-balancer/
+WORKDIR /tmp/ceph-balancer
+
+# Install the package in development mode
+RUN pip3 install -e .
+
+# Create a symlink to the script
+RUN ln -sf /tmp/ceph-balancer/placementoptimizer.py /usr/local/bin/placementoptimizer && \
+    chmod +x /usr/local/bin/placementoptimizer
 
